@@ -1,20 +1,17 @@
-from flask import Flask, request, abort
-
-from linebot import (
-    LineBotApi, WebhookHandler
-)
-from linebot.exceptions import (
-    InvalidSignatureError
-)
-from linebot.models import *
-
-#======python的函數庫==========
 import tempfile, os
 import datetime
 import anthropic
 import time
 import traceback
+from flask import Flask, request, abort, render_template
+from linebot import  LineBotApi, WebhookHandler
+from linebot.exceptions import InvalidSignatureError
+from typing import List
 
+from linebot.models import *
+import  json, ssl, urllib.request
+import requests
+import math
 
 #======python的函數庫==========
 
