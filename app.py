@@ -14,6 +14,8 @@ import datetime
 import anthropic
 import time
 import traceback
+
+
 #======python的函數庫==========
 
 app = Flask(__name__)
@@ -24,65 +26,154 @@ line_bot_api = LineBotApi(os.getenv('CHANNEL_ACCESS_TOKEN'))
 # Channel Secret
 handler = WebhookHandler(os.getenv('CHANNEL_SECRET'))
 
-# Anthropic API Key初始化設定
-anthropic.api_key = os.getenv('ANTHROPIC_API_KEY')
 
-def Claude_response(text):
-    # 接收回應
-    response = anthropic.Completion.create(
-        model="claude-v1.3", 
-        prompt=f"{anthropic.HUMAN_PROMPT} {text}{anthropic.AI_PROMPT}",
-        max_tokens_to_sample=500,
-        temperature=0.5
-    )
-    print(response)
-    
-    # 重組回應
-    answer = response['completion'].replace('。','')
-    
-    return answer
+###handler = WebhookHandler('81d02ef0bf37d4b7c516d81f76d8b5d8')
+arlist = []
+snalist = []
+latlist = []
+lnglist = []
+bemplist = []
+sbilist = []
+tmplist = []
+context = ssl._create_unverified_context()
+url1 = 'https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json'  
+url2 = 'https://data.tycg.gov.tw/opendata/datalist/datasetMeta/download?id=5ca2bfc7-9ace-4719-88ae-4034b9a5a55c&rid=a1b4714b-3b75-4ff8-a8f2-cc377e4eaa0f'  
+cities = ['宜蘭縣', '花蓮縣', '臺東縣', '澎湖縣', '金門縣', '連江縣', '臺北市', '新北市', '桃園市', '臺中市', '臺南市', '高雄市', '基隆市', '新竹縣', '新竹市', '苗栗縣', '彰化縣', '南投縣', '雲林縣', '嘉義縣', '嘉義市', '屏東縣']
 
-# 監聽所有來自 /callback 的 Post Request
+
 @app.route("/callback", methods=['POST'])
 def callback():
-    # get X-Line-Signature header value
     signature = request.headers['X-Line-Signature']
-    # get request body as text
     body = request.get_data(as_text=True)
     app.logger.info("Request body: " + body)
-    # handle webhook body
+    print(body)
     try:
         handler.handle(body, signature)
     except InvalidSignatureError:
         abort(400)
     return 'OK'
 
-# 處理訊息
+def get(city):
+    token = os.getenv('WEATHER_TOCKEN')
+    url = 'https://opendata.cwb.gov.tw/api/v1/rest/datastore/F-C0032-001?Authorization=' + token + '&format=JSON&locationName=' + str(city)
+    Data = requests.get(url)
+    Data = (json.loads(Data.text,encoding='utf-8'))['records']['location'][0]['weatherElement']
+    res = [[] , [] , []]
+    for j in range(3):
+        for i in Data:
+            res[j].append(i['time'][j])
+    return res
+
+
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    msg = event.message.text
-    try:
-        Claude_answer = Claude_response(msg)
-        print(Claude_answer)
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(Claude_answer))
-    except:
-        print(traceback.format_exc())
-        line_bot_api.reply_message(event.reply_token, TextSendMessage('你所使用的Anthropic API key額度可能已經超過，請於後台Log內確認錯誤訊息'))
-
-@handler.add(PostbackEvent)
-def handle_message(event):
-    print(event.postback.data)
-
-@handler.add(MemberJoinedEvent)
-def welcome(event):
-    uid = event.joined.members[0].user_id
-    gid = event.source.group_id
-    profile = line_bot_api.get_group_member_profile(gid, uid)
-    name = profile.display_name
-    message = TextSendMessage(text=f'{name}歡迎加入')
-    line_bot_api.reply_message(event.reply_token, message)
+    mtext = event.message.text
+    message_type = event.message.type
+    user_id = event.source.user_id
+    reply_token = event.reply_token
+    message = event.message.text
+    if mtext[:7]== '@choice' and mtext[:7]!='':    
+        city = message[7:]
+        city = city.replace('台','臺')
         
-import os
-if __name__ == "__main__":
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+        if mtext[7:]=='台北市':
+            with urllib.request.urlopen(url1, context=context) as jsondata:
+                data = json.loads(jsondata.read().decode('utf-8-sig'))        
+            snalist.clear()
+            arlist.clear() 
+            latlist.clear()
+            lnglist.clear()
+            bemplist.clear()
+            sbilist.clear()
+                     
+            for i in data:
+                snalist.append((i['sna']))
+                arlist.append(i['ar'])
+                latlist.append(i['lat'])
+                lnglist.append(i['lng'])
+                bemplist.append(i['bemp'])
+                sbilist.append(i['sbi'])
+            #print(latlist)    
+        if mtext[7:]=='桃園市':
+            with urllib.request.urlopen(url2, context=context) as jsondata:
+                data2 = json.loads(jsondata.read().decode('utf-8-sig'))
+            snalist.clear()
+            arlist.clear() 
+            latlist.clear()
+            lnglist.clear()
+            bemplist.clear()
+            sbilist.clear() 
+
+            for i in data2['retVal']:
+                snalist.append(data2['retVal'][i]['sna'])
+                arlist.append(data2['retVal'][i]['ar'])            
+                latlist.append(float(data2['retVal'][i]['lat']))
+                lnglist.append(float(data2['retVal'][i]['lng']))
+                bemplist.append(data2['retVal'][i]['bemp'])
+                sbilist.append(data2['retVal'][i]['sbi'])
+                
+        if(not (city in cities)):
+            line_bot_api.reply_message(reply_token,TextSendMessage(text="查詢格式為:@choice縣市"))
+        else:
+            res = get(city)
+            line_bot_api.reply_message(reply_token, TemplateSendMessage(
+                alt_text = 'Ubike站查詢範圍為'+city+',請分享您的位置訊息查詢最近的ubike站及空位,這邊附上未來 36 小時天氣預測',
+                template = CarouselTemplate(
+                    columns = [
+                        CarouselColumn(
+                            thumbnail_image_url = 'https://i.imgur.com/xjSwtFD.png',
+                            title = '{} ~ {}'.format(res[0][0]['startTime'][5:-3],res[0][0]['endTime'][5:-3]),
+                            text = '天氣狀況 {}\n溫度 {} ~ {} °C\n降雨機率 {}'.format(data[0]['parameter']['parameterName'],data[2]['parameter']['parameterName'],data[4]['parameter']['parameterName'],data[1]['parameter']['parameterName']),
+                            actions = [
+                                URIAction(
+                                    label = '詳細內容',
+                                    uri = 'https://www.cwb.gov.tw/V8/C/W/County/index.html'
+                                )
+                            ]
+                        )for data in res
+                    ]
+                )
+            ))
+
+    else:
+        line_bot_api.reply_message(reply_token, TextSendMessage(text=message))
+   #----------------------------------------------------------------------------    
+
+       
+@handler.add(MessageEvent, message=LocationMessage)
+def handle_location_message(event):
+    #addr = event.message.address #地址
+    lat = event.message.latitude  #緯度
+    lng = event.message.longitude #緯度
+    minDistance=getDistance(lat,lng,latlist[0],lnglist[0])
+    for i in range(len(lnglist)):       
+        if(getDistance(lat,lng,latlist[i],lnglist[i])<=minDistance):
+            minDistance=getDistance(lat,lng,latlist[i],lnglist[i])
+            tmpi=i
+    ans=round(float(minDistance)*1000,4)
+    line_bot_api.reply_message(event.reply_token,TextSendMessage(text='最近的站: '+str(snalist[tmpi])+"\n"+'位置: '+str(arlist[tmpi])+"\n"+"目前可用車輛數: "+str(sbilist[tmpi])+"\n"+'目前空位數: '+str(bemplist[tmpi])+"\n"+'距離: '+str(ans)+'公尺')) 
+    print(minDistance)
+    
+# 計算距離
+def getDistance(latA, lonA, latB, lonB):
+    ra = 6378140  # 赤道半徑
+    rb = 6356755  # 極半徑
+    flatten = (ra - rb) / ra  # Partial rate of the earth
+    # change angle to radians
+    radLatA = math.radians(latA)
+    radLonA = math.radians(lonA)
+    radLatB = math.radians(latB)
+    radLonB = math.radians(lonB)
+
+    pA = math.atan(rb / ra * math.tan(radLatA))
+    pB = math.atan(rb / ra * math.tan(radLatB))
+    x = math.acos(math.sin(pA) * math.sin(pB) + math.cos(pA) * math.cos(pB) * math.cos(radLonA - radLonB))
+    c1 = (math.sin(x) - x) * (math.sin(pA) + math.sin(pB)) ** 2 / math.cos(x / 2) ** 2
+    c2 = (math.sin(x) + x) * (math.sin(pA) - math.sin(pB)) ** 2 / math.sin(x / 2) ** 2
+    dr = flatten / 8 * (c1 - c2)
+    distance = ra * (x + dr)
+    distance = round(distance/1000, 4)
+    return f'{distance}'         
+
+if __name__ == '__main__':
+    app.run(debug=True)
