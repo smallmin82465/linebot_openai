@@ -24,7 +24,6 @@ line_bot_api = LineBotApi(os.getenv('CHANNEL_ACCESS_TOKEN'))
 handler = WebhookHandler(os.getenv('CHANNEL_SECRET'))
 
 
-###handler = WebhookHandler('81d02ef0bf37d4b7c516d81f76d8b5d8')
 arlist = []
 snalist = []
 latlist = []
